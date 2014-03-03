@@ -30,6 +30,8 @@ SET(TARGET_GLIB 2.32)
 PKG_CHECK_MODULES_FULLPATH(GTK    REQUIRED gtk+-3.0>=3.4)
 PKG_CHECK_MODULES_FULLPATH(GIO    REQUIRED gio-2.0>=${TARGET_GLIB})
 PKG_CHECK_MODULES_FULLPATH(GLIB   REQUIRED glib-2.0>=${TARGET_GLIB})
+PKG_CHECK_MODULES_FULLPATH(GSTREAMER REQUIRED gstreamer-0.10 gstreamer-interfaces-0.10)
+PKG_CHECK_MODULES_FULLPATH(GDKX11    REQUIRED gdk-x11-3.0)
 PKG_CHECK_MODULES_FULLPATH(SQLITE REQUIRED sqlite3>=3.7)
 PKG_CHECK_MODULES_FULLPATH(JSON   REQUIRED json-glib-1.0>=0.14)
 PKG_CHECK_MODULES_FULLPATH(TOX    REQUIRED libtoxcore>=0.0)
@@ -59,6 +61,8 @@ SET(CMAKE_C_FLAGS ${CMAKE_C_FLAGS}
                   ${GTK_CFLAGS}    ${GTK_CFLAGS_OTHER}
                   ${GIO_CFLAGS}    ${GIO_CFLAGS_OTHER}
                   ${GLIB_CFLAGS}   ${GLIB_CFLAGS_OTHER}
+                  ${GSTREAMER_CFLAGS} ${GSTREAMER_CFLAGS_OTHER}
+                  ${GDKX11_CFLAGS} ${GDKX11_CFLAGS_OTHER}
                   ${SQLITE_CFLAGS} ${SQLITE_CFLAGS_OTHER}
                   ${JSON_CFLAGS}   ${JSON_CFLAGS_OTHER}
                   ${TOX_CFLAGS}    ${TOX_CFLAGS_OTHER}
@@ -152,6 +156,23 @@ VALA_PRECOMPILE( VALA_C_GROUP_BOT
   GENERATE_HEADER
 )
 
+VALA_PRECOMPILE( VALA_C_TOXAV_TEST
+    testing/ToxAVTest.vala
+  PACKAGES
+    gstreamer-0.10
+    gstreamer-interfaces-0.10
+    gdk-x11-3.0
+    tox-1.0
+    gtk+-3.0
+  OPTIONS
+    --debug
+    --target-glib=${TARGET_GLIB}
+    --vapidir=${CMAKE_SOURCE_DIR}/src/vapi
+  CUSTOM_VAPIS
+  GENERATE_VAPI
+  GENERATE_HEADER
+)
+
 GLIB_COMPILE_RESOURCES( GLIB_RESOURCES_VENOM
   SOURCE
     ui/venom.gresource.xml
@@ -172,6 +193,10 @@ ADD_EXECUTABLE( group_bot EXCLUDE_FROM_ALL
   ${VALA_C_GROUP_BOT}
 )
 
+ADD_EXECUTABLE( toxav_test EXCLUDE_FROM_ALL
+  ${VALA_C_TOXAV_TEST}
+)
+
 TARGET_LINK_LIBRARIES( venom
                        ${TOX_LIBRARIES}
                        ${SQLITE_LIBRARIES}
@@ -189,6 +214,13 @@ TARGET_LINK_LIBRARIES( test_dht
 TARGET_LINK_LIBRARIES( group_bot
                        ${TOX_LIBRARIES}
                        ${GIO_LIBRARIES}
+)
+
+TARGET_LINK_LIBRARIES( toxav_test
+                       ${TOX_LIBRARIES}
+                       ${GSTREAMER_LIBRARIES}
+                       ${GDKX11_LIBRARIES}
+                       ${GTK_LIBRARIES}
 )
 
 INSTALL(TARGETS venom RUNTIME DESTINATION ${CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION})
