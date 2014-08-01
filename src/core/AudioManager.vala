@@ -66,7 +66,7 @@ namespace Venom {
     private const string VIDEO_SOURCE_OUT   = "videoSourceOut";
     private const string VIDEO_SINK_OUT     = "videoSinkOut";  
 
-    private const string VIDEO_CAPS = "video/x-raw-yuv,format=i420,width=640,height=480,framerate=24/1";
+    private const string VIDEO_CAPS = "video/x-raw-yuv,format=(fourcc)I420,width=640,height=480,framerate=24/1";
 
     private const int MAX_CALLS = 16;
     CallInfo[] calls = new CallInfo[MAX_CALLS];
@@ -251,6 +251,12 @@ namespace Venom {
       Logger.log(LogLevel.INFO, "Video pipeline set to playing");
     }
 
+    private void set_video_pipeline_paused() { 
+      video_pipeline_in.set_state(Gst.State.PAUSED);
+      video_pipeline_out.set_state(Gst.State.PAUSED);
+      Logger.log(LogLevel.INFO, "Video pipeline set to paused");
+    }
+
     private string get_audio_caps_from_codec_settings(ref ToxAV.CodecSettings settings) {
       return "audio/x-raw-int,channels=(int)%u,rate=(int)%u,signed=(boolean)true,width=(int)16,depth=(int)16,endianness=(int)1234".printf(settings.audio_channels, settings.audio_sample_rate);
     }
@@ -294,34 +300,16 @@ namespace Venom {
     }
 
     private void video_buffer_in(Vpx.Image frame) { 
-       uint len = frame.d_w * frame.d_h * 3;
-       Gst.Buffer gst_buf = new Gst.Buffer.and_alloc(len);
-       uint8[] tempBuf = {};
-       int i;
-       int j;
-
-    /*   for(i = 0; i < frame.d_h; ++i) { 
-         for(j = 0; j < frame.d_w; ++j) { 
-           uint8 y = frame.planes[0, ((i * frame.stride[0]) + j)];
-           uint8 u = frame.planes[1, (((i / 2) * frame.stride[1]) + (j / 2))];
-           uint8 v = frame.planes[2, (((i / 2) * frame.stride[2]) + (j / 2))];
-
-           tempBuf += y;
-           tempBuf += u;
-           tempBuf += v;
-                  
-         }
-      }
-    */
-
-      Memory.copy(gst_buf.data, frame.planes, len);
-      for(i = 0; i < len; i++) { 
+      uint len = frame.d_w * frame.d_h;
+      Gst.Buffer gst_buf = new Gst.Buffer.and_alloc((len * 6) / 4);
+      Memory.copy(gst_buf.data                        , *(frame.planes + 0), len);
+      Memory.copy((uint8*)gst_buf.data + len          , *(frame.planes + 1), len / 4);
+      Memory.copy((uint8*)gst_buf.data + len + len / 4, *(frame.planes + 2), len / 4);
+      /*for(int i = 0; i < len; i+=3) {
         stdout.printf("[%u]    [%u]    [%u]\n", gst_buf.data[i], gst_buf.data[i+1], gst_buf.data[i+2]);
-        i += 3;
-      }
+      }*/
       video_source_in.push_buffer(gst_buf);
-      //Logger.log(LogLevel.DEBUG, "pushed %i bytes to VIDEO_IN pipeline".printf(len));
-      return;
+      Logger.log(LogLevel.DEBUG, "pushed %u bytes to VIDEO_IN pipeline".printf(len));
     }
 
     private uint8[] video_buffer_out() { 
@@ -379,9 +367,10 @@ namespace Venom {
               ToxAV.AV_Error e = toxav.kill_transmission(c.call_index);
               if(e != ToxAV.AV_Error.NONE) {
                 Logger.log(LogLevel.FATAL, "Could not shutdown AV transmission: %s".printf(e.to_string()));
+              } else {
+                number_of_calls--;
+                calls[c.call_index].active = false;
               }
-              number_of_calls--;
-              calls[c.call_index].active = false;
               break;
             case AVStatusChangeType.MUTE:
               Logger.log(LogLevel.DEBUG, (c.var1 == 1) ? "Muting %i".printf(c.call_index) : "Unmuting %i".printf(c.call_index));
@@ -441,6 +430,7 @@ namespace Venom {
 
       Logger.log(LogLevel.INFO, "stopping audio thread...");
       set_audio_pipeline_paused();
+      set_video_pipeline_paused();
       return 0;
     }
 
