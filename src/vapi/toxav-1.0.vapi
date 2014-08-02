@@ -239,7 +239,7 @@ namespace ToxAV {
     * @param callback The callback
     * @return void
     */
-    [CCode (has_target = false, has_type_id = false)]
+    [CCode (has_type_id = false)]
     public delegate void AudioRecvCallback(ToxAV toxav, int32 call_index, [CCode(array_length_type="int")] int16[] frames);
     public void register_audio_recv_callback(AudioRecvCallback callback);
 
@@ -249,7 +249,7 @@ namespace ToxAV {
     * @param callback The callback
     * @return void
     */
-    [CCode (has_target = false, has_type_id = false)]
+    [CCode (has_type_id = false)]
     public delegate void VideoRecvCallback(ToxAV toxav, int32 call_index, Vpx.Image frame);
     public void register_video_recv_callback(VideoRecvCallback callback);
 
@@ -360,19 +360,19 @@ namespace ToxAV {
      * @retval 0 Success.
      * @retval ToxAvError On error.
      */
-    public AV_Error send_video (int32 call_index, [CCode(array_length=false)] uint8[] frame, int frame_size);
+    public AV_Error send_video (int32 call_index, [CCode(array_length=false)] uint8[] frame, uint frame_size);
 
     /**
      * @brief Send audio frame.
      *
      * @param av Handler.
-     * @param frame The frame.
-     * @param frame_size It's size.
+     * @param data The audio data encoded with toxav_prepare_audio_frame().
+     * @param size Its size in number of bytes.
      * @return int
      * @retval 0 Success.
      * @retval ToxAvError On error.
      */
-    public AV_Error send_audio (int32 call_index, [CCode(array_length=false)] uint8[] frame, int frame_size);
+    public AV_Error send_audio (int32 call_index, [CCode(array_length=false)] uint8[] frame, uint frame_size);
 
     /**
      * @brief Encode video frame
