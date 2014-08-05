@@ -301,13 +301,25 @@ namespace Venom {
 
     private void video_buffer_in(Vpx.Image frame) { 
       uint len = frame.d_w * frame.d_h;
-      Gst.Buffer gst_buf = new Gst.Buffer.and_alloc((len * 6) / 4);
-      Memory.copy(gst_buf.data                        , *(frame.planes + 0), len);
-      Memory.copy((uint8*)gst_buf.data + len          , *(frame.planes + 1), len / 4);
-      Memory.copy((uint8*)gst_buf.data + len + len / 4, *(frame.planes + 2), len / 4);
-      /*for(int i = 0; i < len; i+=3) {
-        stdout.printf("[%u]    [%u]    [%u]\n", gst_buf.data[i], gst_buf.data[i+1], gst_buf.data[i+2]);
-      }*/
+      Gst.Buffer gst_buf = new Gst.Buffer.and_alloc(len + len / 2);
+      uint8[] y = {};
+      uint8[] u = {};
+      uint8[] v = {};
+      
+      int i, j;
+      for (i = 0; i < frame.d_h; ++i) {
+        for (j = 0; j < frame.d_w; ++j) {
+
+            y += *(*(frame.planes + 0)+((i * frame.stride[0]) + j));
+            u += *(*(frame.planes + 1)+(((i / 2) * frame.stride[1]) + (j / 2)));
+            v += *(*(frame.planes + 2)+(((i / 2) * frame.stride[2]) + (j / 2)));
+        }
+      } 
+
+      Memory.copy(gst_buf.data                        , y, len);
+      Memory.copy((uint8*)gst_buf.data + len          , u, len / 4);
+      Memory.copy((uint8*)gst_buf.data + len + len / 4, v, len / 4);
+
       video_source_in.push_buffer(gst_buf);
       Logger.log(LogLevel.DEBUG, "pushed %u bytes to VIDEO_IN pipeline".printf(len));
     }
