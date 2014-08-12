@@ -232,7 +232,7 @@ namespace Venom {
 
     private void video_receive_callback(ToxAV.ToxAV toxav, int32 call_index, Vpx.Image frame) {
       Logger.log(LogLevel.DEBUG, "Got video frame, of size: %u".printf(frame.d_w * frame.d_h));
-      //video_buffer_in(frame);
+      video_buffer_in(frame);
     }
 
     private void register_callbacks() {
@@ -469,8 +469,8 @@ namespace Venom {
 
             if(calls[i].video) {
               outImage = make_vpx_image();                
-              video_buffer_in(outImage);
-              /*prep_frame_ret = toxav.prepare_video_frame(i, enc_buffer, outImage);
+              //video_buffer_in(outImage);
+              prep_frame_ret = toxav.prepare_video_frame(i, enc_buffer, outImage);
               stdout.printf("prep_frame_ret_video = %u\n", prep_frame_ret);
               if(prep_frame_ret <= 0) { 
                  Logger.log(LogLevel.WARNING, "prepare_video_frame returned an error: %i".printf(prep_frame_ret));
@@ -479,7 +479,7 @@ namespace Venom {
                 if(send_video_ret != ToxAV.AV_Error.NONE) { 
                   Logger.log(LogLevel.WARNING, "send_video returned %d".printf(send_video_ret));
                 }
-              } */
+              } 
               
             }
 
