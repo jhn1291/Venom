@@ -61,13 +61,14 @@ namespace Venom {
     private const string VIDEO_SOURCE_IN    = "videoSourceIn";
     private const string VIDEO_CONVERTER    = "videoConverter";
     private const string VIDEO_SINK_IN      = "videoSinkIn";
-    
+
     private const string VIDEO_PIPELINE_OUT = "videoPipelineOut";
     private const string VIDEO_SOURCE_OUT   = "videoSourceOut";
     private const string VIDEO_CONVERTER_OUT = "videoConverterOut";
     private const string VIDEO_SINK_OUT     = "videoSinkOut";  
 
-    private const string VIDEO_CAPS  = "video/x-raw-yuv,format=(fourcc)I420,width=640,height=480,framerate=24/1";
+    private const string VIDEO_CAPS_IN   = "video/x-raw-yuv,format=(fourcc)I420,width=640,height=480,framerate=24/1";
+    private const string VIDEO_CAPS_OUT  = "video/x-raw-yuv,format=(fourcc)I420,width=640,height=480";
 
 
     private const int MAX_CALLS = 16;
@@ -180,7 +181,7 @@ namespace Venom {
 
       // output video pipeline
       try {
-        video_pipeline_out = Gst.parse_launch("videotestsrc name=" + VIDEO_SOURCE_OUT +
+        video_pipeline_out = Gst.parse_launch("autovideosrc name=" + VIDEO_SOURCE_OUT +
                                            " ! ffmpegcolorspace" +
                                            " ! appsink name=" + VIDEO_SINK_OUT) as Gst.Pipeline;
       } catch (Error e) {
@@ -192,15 +193,17 @@ namespace Venom {
 
       // caps
       Gst.Caps caps  = Gst.Caps.from_string(get_audio_caps_from_codec_settings(ref default_settings));
-      Gst.Caps vcaps = Gst.Caps.from_string(VIDEO_CAPS);
+      Gst.Caps vcaps_in = Gst.Caps.from_string(VIDEO_CAPS_IN);
+      Gst.Caps vcaps_out = Gst.Caps.from_string(VIDEO_CAPS_OUT);
       Logger.log(LogLevel.INFO, "Audio caps are [" + caps.to_string() + "]");
-      Logger.log(LogLevel.INFO, "Video caps are [" + vcaps.to_string() + "]");
+      Logger.log(LogLevel.INFO, "Video(IN) caps are [" + vcaps_in.to_string() + "]");
+      Logger.log(LogLevel.INFO, "Video(OUT) caps are [" + vcaps_out.to_string() + "]");
 
       audio_source_in.caps = caps;
       audio_sink_out.caps  = caps;
 
-      video_source_in.caps = vcaps;
-      video_sink_out.caps  = vcaps;
+      video_source_in.caps = vcaps_in;
+      video_sink_out.caps  = vcaps_out;
 
       //audio_sink_out.blocksize = (ToxAV.DefaultCodecSettings.audio_frame_duration * ToxAV.DefaultCodecSettings.audio_sample_rate) / 1000 * 2;
       //audio_sink_out.drop = true;
@@ -351,19 +354,14 @@ namespace Venom {
     /////////////////////////////////////////////////
     //Working on the below two functions
 
-    private uint8[] video_buffer_out() { 
-        Gst.Buffer gst_buf = video_sink_out.pull_buffer();
-        Logger.log(LogLevel.DEBUG, "pulled %i bytes form VIDEO_OUT pipeline".printf(gst_buf.data.length));
-        return gst_buf.data;
-    }
-
-
 
     //TODO: Should send this function args for making the vpx.image
-    private Vpx.Image make_vpx_image() { 
-       uint8[] img_data = video_buffer_out();
+    private Vpx.Image make_vpx_image() {
+       Gst.Buffer gst_buf = video_sink_out.pull_buffer();
+       Logger.log(LogLevel.DEBUG, "pulled %i bytes form VIDEO_OUT pipeline".printf(gst_buf.data.length));
        //These should be args and not constants... but w/e for now :P
-       Vpx.Image my_image = Vpx.Image.wrap(null, Vpx.ImageFormat.I420, 640, 480, 0, img_data);
+       Logger.log(LogLevel.DEBUG, "Buffer caps: " + gst_buf.caps.to_string());
+       Vpx.Image my_image = Vpx.Image.wrap(null, Vpx.ImageFormat.I420, 640, 480, 0, gst_buf.data);
        return my_image;
     }
 
@@ -385,6 +383,7 @@ namespace Venom {
       int buffer_size;
       int16[] buffer = new int16[perframe];
       uint8[] enc_buffer = new uint8[perframe*2];
+      uint8[] video_enc_buffer = new uint8[800 * 600 * 4];
       Vpx.Image outImage;
       ToxAV.AV_Error prep_frame_ret = 0, send_audio_ret = 0, send_video_ret = 0;
       //ToxAV.AV_Error send_video_ret;
@@ -450,11 +449,11 @@ namespace Venom {
           if(calls[i].active) {
             prep_frame_ret = toxav.prepare_audio_frame(i, enc_buffer, buffer, buffer_size);
             if(prep_frame_ret <= 0) {
-              Logger.log(LogLevel.ERROR, "prepare_audio_frame returned an error: %s".printf(prep_frame_ret.to_string()));
+              Logger.log(LogLevel.WARNING, "prepare_audio_frame returned an error: %s".printf(prep_frame_ret.to_string()));
             } else {
               send_audio_ret = toxav.send_audio(i, enc_buffer, prep_frame_ret);
               if(send_audio_ret != ToxAV.AV_Error.NONE) {
-                Logger.log(LogLevel.ERROR, "send_audio returned %s".printf(send_audio_ret.to_string()));
+                Logger.log(LogLevel.WARNING, "send_audio returned %s".printf(send_audio_ret.to_string()));
               }
             }
 
@@ -469,18 +468,16 @@ namespace Venom {
 
             if(calls[i].video) {
               outImage = make_vpx_image();                
-              //video_buffer_in(outImage);
-              prep_frame_ret = toxav.prepare_video_frame(i, enc_buffer, outImage);
-              stdout.printf("prep_frame_ret_video = %u\n", prep_frame_ret);
+              prep_frame_ret = toxav.prepare_video_frame(i, video_enc_buffer, outImage);
               if(prep_frame_ret <= 0) { 
                  Logger.log(LogLevel.WARNING, "prepare_video_frame returned an error: %i".printf(prep_frame_ret));
               } else {
-                send_video_ret = toxav.send_video(i, enc_buffer, prep_frame_ret);
-                if(send_video_ret != ToxAV.AV_Error.NONE) { 
+                Logger.log(LogLevel.DEBUG, "prep_frame_ret_video = %i".printf(prep_frame_ret));
+                send_video_ret = toxav.send_video(i, video_enc_buffer, prep_frame_ret);
+                if(send_video_ret != ToxAV.AV_Error.NONE) {
                   Logger.log(LogLevel.WARNING, "send_video returned %d".printf(send_video_ret));
                 }
-              } 
-              
+              }
             }
 
            //End work zone 
