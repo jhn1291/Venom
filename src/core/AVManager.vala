@@ -133,11 +133,7 @@ namespace Venom {
 
     public static void init() throws AVManagerError {
 #if DEBUG
-<<<<<<< HEAD:src/core/AudioManager.vala
-      instance = new AudioManager({"", "--gst-debug-level=0"});
-=======
       instance = new AVManager({"", "--gst-debug-level=3"});
->>>>>>> 2ce651b747a524bef062f0ea98c29dcf6f36c4d4:src/core/AVManager.vala
 #else
       instance = new AVManager({""});
 #endif
