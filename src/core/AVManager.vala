@@ -109,6 +109,11 @@ namespace Venom {
     private Gst.Element  video_source_out;
     private Gst.Element  video_converter_out;
     private Gst.AppSink  video_sink_out;
+    
+    private Gst.Bus audio_in_bus;
+    private Gst.Bus audio_out_bus;
+    private Gst.Bus video_in_bus;
+    private Gst.Bus video_out_bus;
 
     private Thread<int> audio_thread = null;
     private Thread<int> video_thread = null;
@@ -169,6 +174,8 @@ namespace Venom {
       audio_volume_in = pipeline_in.get_by_name(AUDIO_VOLUME_IN);
       audio_sink_in   = pipeline_in.get_by_name(AUDIO_SINK_IN);
 
+      audio_in_bus = pipeline_in.get_bus();
+
       // output audio pipeline
       try {
         pipeline_out = Gst.parse_launch("pulsesrc name=" + AUDIO_SOURCE_OUT +
@@ -181,6 +188,8 @@ namespace Venom {
       audio_volume_out = pipeline_out.get_by_name(AUDIO_VOLUME_OUT);
       audio_sink_out   = pipeline_out.get_by_name(AUDIO_SINK_OUT) as Gst.AppSink;
 
+      audio_out_bus = pipeline_out.get_bus();
+
       // input video pipeline
       try {
         video_pipeline_in = Gst.parse_launch("appsrc name=" + VIDEO_SOURCE_IN +
@@ -191,6 +200,8 @@ namespace Venom {
       }
       video_source_in = video_pipeline_in.get_by_name(VIDEO_SOURCE_IN) as Gst.AppSrc;
       video_sink_in   = video_pipeline_in.get_by_name(VIDEO_SINK_IN);
+
+      video_in_bus = video_pipeline_in.get_bus();
 
       // output video pipeline
       try {
@@ -203,6 +214,15 @@ namespace Venom {
       video_source_out = video_pipeline_out.get_by_name(VIDEO_SOURCE_OUT);
       video_converter_out = video_pipeline_out.get_by_name(VIDEO_CONVERTER_OUT);
       video_sink_out   = video_pipeline_out.get_by_name(VIDEO_SINK_OUT) as Gst.AppSink;
+
+      video_out_bus = video_pipeline_out.get_bus();
+ 
+      //set the bus callbacks
+      audio_in_bus.add_watch( bus_callback);
+      audio_out_bus.add_watch(bus_callback);
+      video_in_bus.add_watch( bus_callback);
+      video_out_bus.add_watch(bus_callback);
+      
 
       // caps
       Gst.Caps caps  = Gst.Caps.from_string(get_audio_caps_from_codec_settings(ref default_settings));
@@ -250,6 +270,18 @@ namespace Venom {
       
       Gst.deinit();
       Logger.log(LogLevel.INFO, "Gstreamer deinitialized");
+    }
+
+    private bool bus_callback(Gst.Bus bus, Gst.Message message) { 
+      if(bus == audio_in_bus)  
+        stdout.printf("Audio_in_bus with message: %d\n", message.type);
+      if(bus == audio_out_bus)
+        stdout.printf("Audio_out_bus with message: %d\n", message.type);
+      if(bus == video_in_bus) 
+        stdout.printf("Video_in_bus with message: %d\n", message.type);
+      if(bus == video_out_bus) 
+        stdout.printf("Video_out_bus with message: %d\n", message.type);
+      return true;
     }
 
     private void audio_receive_callback(ToxAV.ToxAV toxav, int32 call_index, int16[] samples) {
