@@ -99,7 +99,6 @@ namespace Venom {
     public void cleanup() {
       if(cleaned_up)
         return;
-
       Logger.log(LogLevel.DEBUG, "Ending session...");
       // Stop background thread
       session.stop();
@@ -638,6 +637,9 @@ namespace Venom {
       if(!is_active && Settings.instance.enable_urgency_notification) {
         this.set_urgency_hint(true);
         this.set_title("* %s".printf(this.our_title));
+        if(sound != null) {
+          AVManager.instance.play_sound(sound);
+        }
       }
     }
 
